@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 if [ "$#" -ne 2 ]; then
     echo "Usage: fetch.sh [robot-id] [uni-id]"
     exit

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 if [ "$#" -ne 3 ]; then
     echo "Usage: load.sh [robot-id] [task-id] [uni-id]"
     exit
