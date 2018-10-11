@@ -4,9 +4,9 @@ if [ "$#" -ne 2 ]; then
     exit
 fi
 echo "Cloning your repository..."
-git clone https://$2@gitlab.cs.ttu.ee/$2/iti0201.git student
+git clone https://$2@gitlab.cs.ttu.ee/$2/iti0201-2018.git student
 echo "Copying your output from the robot..."
-sshpass -p 'wellwellwellhellothere' scp drop@192.168.0.$1:/dropzone/output.txt .
+sshpass -p 'iomgomoeirjgeorigj' scp drop@192.168.0.9$1:/dropzone/output.txt .
 TIMESTAMP=$(date +%s)
 rm -rf student/logs
 mkdir student/logs
