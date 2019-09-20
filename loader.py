@@ -5,12 +5,14 @@ import sys
 import socket
 import paramiko
 import getpass
+import pygit2
+
 
 class Loader:
-    def __init__(self):
+    def __init__(self, password):
         self.host_keys = paramiko.util.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
         try:
-            self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), getpass.getpass("RSA key password: "))
+            self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), password)
         except paramiko.ssh_exception.SSHException as e:
             print("Wrong password!")
             sys.exit(-1)
@@ -68,7 +70,11 @@ class Loader:
         pass
 
 def main():
-    loader = Loader()
+    password = getpass.getpass("Enter password: ")
+    loader = Loader(password)
+    userpass = pygit2.UserPass("robobot", password)
+    callbacks = pygit2.RemoteCallbacks(credentials=userpass)
+    pygit2.clone_repository("https://gitlab.cs.ttu.ee/gert.kanter/iti0201-2019", "student", callbacks=callbacks)
 
 if __name__ == "__main__":
     main()
