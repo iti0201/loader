@@ -6,6 +6,7 @@ import socket
 import paramiko
 import getpass
 import pygit2
+import shutil
 
 
 class Loader:
@@ -20,14 +21,30 @@ class Loader:
         self.transport = {}
         for sock in self.sock:
             self.sock[sock] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #self.client = paramiko.SSHClient()
+
         self.connect(94)
+        files = self.get_source_files("S")
+        #print(files)
+
+    def copy(self):
         sftp = paramiko.SFTPClient.from_transport(self.transport[94])
         print(sftp.listdir("."))
+        #sftp.put("myfile", "robot/myfile")
+
+    def command(self):
         chan = self.transport[94].open_session()
         res = chan.exec_command("sleep 10")
-        print(res)
-        #sftp.put("myfile", "robot/myfile")
+
+    def get_source_files(self, task_id):
+        path = os.getcwd() + "/student/" + task_id + "/"
+        source_files = []
+        if os.path.exists(path):
+                for root, dirs, files in os.walk(path, topdown = False):
+                    for name in files:
+                        source_files.append(str(os.path.join(root, name)))
+        else:
+            print("Path not found ({})".format(path))
+        return source_files
             
     def connect(self, host):
         try:
@@ -70,11 +87,16 @@ class Loader:
         pass
 
 def main():
+    path = os.getcwd() + "/student/"
+    try:
+        shutil.rmtree(path)
+    except:
+        pass
     password = getpass.getpass("Enter password: ")
-    loader = Loader(password)
     userpass = pygit2.UserPass("robobot", password)
     callbacks = pygit2.RemoteCallbacks(credentials=userpass)
     pygit2.clone_repository("https://gitlab.cs.ttu.ee/gert.kanter/iti0201-2019", "student", callbacks=callbacks)
+    loader = Loader(password)
 
 if __name__ == "__main__":
     main()
