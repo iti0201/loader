@@ -23,14 +23,19 @@ class Loader:
         for sock in self.sock:
             self.sock[sock] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def ssh_command(self, host, command):
+    def ssh_command(self, host, command, retry=False):
         print("Sending command to host({})...".format(host))
         try:
             chan = self.transport[host].open_session()
             res = chan.exec_command(command) 
+            return True
         except Exception as e:
             print("Unable to open session, retry to connect!")
-            self.ssh_command(host, command)
+            self.connect(host)
+            if not retry:
+                self.ssh_command(host, command, True)
+            else:
+                return False
 
     def get_source_files(self, task_id):
         path = os.getcwd() + "/student/" + task_id + "/"
@@ -84,14 +89,19 @@ class Loader:
         time.sleep(delay)
         return False
 
-    def upload_file(self, host, filename):
+    def upload_file(self, host, filename, retry=False):
         try:
             sftp = paramiko.SFTPClient.from_transport(self.transport[host])
             #print(sftp.listdir("."))
-            sftp.put(filename, "robot/" + filename)
+            sftp.put(filename, "test/" + filename)
         except Exception as e:
             print("Unable to open session, retry to connect!")
-            self.upload_file(host, filename)
+            self.connect(host)
+            if not retry:
+                self.upload_file(host, filename, True)
+            else:
+                return False
+        return True
 
     def clone_repository(self, uni_id):
         path = os.getcwd() + "/student/"
@@ -108,44 +118,98 @@ class Loader:
             return False
         return True
 
+    def prepare_filesystem(self, robot_id):
+        print("prepare_filesystem({})".format(robot_id))
+        if not self.ssh_command("9" + robot_id, "rm -rf test && cp -r robot test"):
+            return False
+        return True
+
+    def execute(self, robot_id):
+        print("execute({})".format(robot_id))
+        if self.kill(robot_id):
+            if self.ssh_command("9" + robot_id, "cd test && timeout 300 python3 robot.py"):
+                return True
+        return False
+
+    def kill(self, robot_id):
+        print("kill({})".format(robot_id))
+        if self.ssh_command("9" + robot_id, "pkill python3"):
+            return True
+        return False
+
     def load(self, uni_id, robot_id, task_id):
         print("load({}, {}, {})".format(uni_id, robot_id, task_id))
+        # Clone student repository
+        if self.clone_repository(uni_id):
+            # Get source files
+            files = self.get_source_files(task_id)
+            # Prepare directory at robot
+            if self.prepare_filesystem(robot_id):
+                if len(files) > 0:
+                    # Upload
+                    success = True
+                    for filename in files:
+                        if not self.upload_file("9" + robot_id, filename):
+                            print("Unable to upload file '{}'!".format(filename))
+                            success = False
+                            break
+                    if success:
+                        # Execute robot.py with redirected output
+                        self.execute(robot_id)
+                else:
+                    print("Unable to get source files!")
+            else:
+                print("Unable to prepare filesystem!")
+        else:
+            print("Unable to clone student repository ({})!".format(uni_id))
 
     def fetch(self, uni_id, robot_id):
         print("fetch({}, {})".format(uni_id, robot_id))
+        # Clone student repository
+        # Get output.txt
+        # Rename based on timestamp
+        # Move timestamped file to "logs" directory
+        # Add log to git commit
+        # Push commit
+
+    def stop(self, robot_id):
+        print("stop({})".format(robot_id))
+        # Execute kill python3 && stop.py
 
 def main():
     password = getpass.getpass("Enter password: ")
     loader = Loader(password)
     command = "l"
+    uni_id = ""
     robot_id = "1"
     task_id = "L1"
     while command != "q":
         try:
-            candidate = input("Command (l=load, f=fetch) [{}]:".format(command))
+            candidate = input("Command (l=load, f=fetch, s=stop) [{}]:".format(command))
             if candidate == "":
                 candidate = command
-            if candidate in ["l", "q", "f"]:
+            if candidate in ["l", "q", "f", "s"]:
                 command = candidate
                 if command == "q":
                     sys.exit(0)
-                uni_id = ""
-                while uni_id == "":
-                    uni_id = input("UNI-ID: ")
-                one_shot = True
-                while one_shot or len(candidate) > 1:
-                    one_shot = False
+                candidate = "0"
+                while len(candidate) > 1 or not candidate.isnumeric() or int(candidate) > 5 or int(candidate) < 1:
                     candidate = input("Robot ID [{}]:".format(robot_id))
+                    if candidate == "":
+                        candidate = robot_id
                 if candidate != "":
                     robot_id = candidate
-                if command == "l":
-                    one_shot = True
-                    while one_shot or len(candidate) != 2 or candidate[0] not in ["L", "O", "M"]:
-                        one_shot = False
-                        candidate = input("Task ID [{}]: ".format(task_id))
-                        if candidate == "":
-                            candidate = task_id
-                    task_id = candidate
+                if command != "s":
+                    uni_id = ""
+                    while uni_id == "":
+                        uni_id = input("UNI-ID: ")
+                    if command == "l":
+                        candidate = "bla"
+                        while len(candidate) != 2 or candidate[0] not in ["L", "O", "M"]:
+                            candidate = input("Task ID [{}]: ".format(task_id))
+                            if candidate == "":
+                                candidate = task_id
+                        task_id = candidate
                 while True:
                     candidate = input("command={}  uni_id={}  robot_id={}  task_id={} - [Y/n]?".format(command, uni_id, robot_id, task_id))
                     if candidate in ["", "y", "Y", "n", "N"]:
@@ -155,9 +219,12 @@ def main():
                 if candidate in ["y", "Y"]:
                     if command == "l":
                         loader.load(uni_id, robot_id, task_id)
-                    else:
+                    elif command == "f":
                         loader.fetch(uni_id, robot_id)
+                    else:
+                        loader.stop(robot_id)
         except KeyboardInterrupt as e:
+            print()
             continue
     # Test commands
     #loader.ssh_command(94, "ls")
