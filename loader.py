@@ -27,7 +27,7 @@ class Loader:
         print("Sending command to host({})...".format(host))
         try:
             chan = self.transport[host].open_session()
-            res = chan.exec_command(command) 
+            chan.exec_command(command) 
             return True
         except Exception as e:
             print("Unable to open session, retry to connect!")
@@ -226,11 +226,7 @@ def main():
         except KeyboardInterrupt as e:
             print()
             continue
-    # Test commands
-    #loader.ssh_command(94, "ls")
-    #loader.connect(94)
-    #files = loader.get_source_files("S")
-    #print(files)
+
 
 if __name__ == "__main__":
     main()
