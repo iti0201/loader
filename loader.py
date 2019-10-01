@@ -13,12 +13,14 @@ import time
 class Loader:
     def __init__(self, password):
         self.host_keys = paramiko.util.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
+        self.userpass = pygit2.UserPass("robobot", password)
+        self.callbacks = pygit2.RemoteCallbacks(credentials=self.userpass)
         try:
             self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), password)
         except paramiko.ssh_exception.SSHException as e:
             print("Wrong password!")
             sys.exit(-1)
-        self.sock = {91: None, 92: None, 93: None, 94: None, 95: None} 
+        self.sock = {"91": None, "92": None, "93": None, "94": None, "95": None} 
         self.transport = {}
         for sock in self.sock:
             self.sock[sock] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -27,13 +29,15 @@ class Loader:
         print("Sending command to host({})...".format(host))
         try:
             chan = self.transport[host].open_session()
+            print("Session opened!")
+            print("Executing command {}".format(command))
             chan.exec_command(command) 
             return True
         except Exception as e:
-            print("Unable to open session, retry to connect!")
+            print("Unable to send command ({}), retry to connect!".format(e))
             self.connect(host)
             if not retry:
-                self.ssh_command(host, command, True)
+                return self.ssh_command(host, command, True)
             else:
                 return False
 
@@ -52,7 +56,7 @@ class Loader:
         delay = 0.5
         try:
             print("Connecting to {}...".format(host)) 
-            hostname = "192.168.0."+str(host)
+            hostname = "192.168.0." + host
             self.sock[host].connect((hostname, 22))
             print("Connected to {}!".format(host))
             self.transport[host] = paramiko.Transport(self.sock[host])
@@ -75,7 +79,7 @@ class Loader:
             else:
                 print("Host key OK.")
         except Exception as e:
-            print("Failed to connect to {}!".format(host))
+            print("Failed to connect to {} ({})!".format(host, e))
             time.sleep(delay)
             return False
         print("Authenticating...")
@@ -90,15 +94,17 @@ class Loader:
         return False
 
     def upload_file(self, host, filename, retry=False):
+        print("upload_file({}, {})".format(host, filename))
         try:
             sftp = paramiko.SFTPClient.from_transport(self.transport[host])
             #print(sftp.listdir("."))
-            sftp.put(filename, "test/" + filename)
+            name = filename.split("/")[-1]
+            sftp.put(filename, "test/" + name)
         except Exception as e:
-            print("Unable to open session, retry to connect!")
+            print("Unable to upload file ({}), retry to connect!".format(e))
             self.connect(host)
             if not retry:
-                self.upload_file(host, filename, True)
+                return self.upload_file(host, filename, True)
             else:
                 return False
         return True
@@ -110,9 +116,7 @@ class Loader:
         except:
             pass
         try:
-            userpass = pygit2.UserPass("robot", self.password)
-            callbacks = pygit2.RemoteCallbacks(credentials=userpass)
-            pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=callbacks)
+            pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
         except:
             print("Unable to clone repository!")
             return False
@@ -127,7 +131,7 @@ class Loader:
     def execute(self, robot_id):
         print("execute({})".format(robot_id))
         if self.kill(robot_id):
-            if self.ssh_command("9" + robot_id, "cd test && timeout 300 python3 robot.py"):
+            if self.ssh_command("9" + robot_id, "cd test && ROBOT_ID=" + robot_id + " timeout 300 python3 robot.py"):
                 return True
         return False
 
