@@ -15,6 +15,7 @@ class Loader:
         self.host_keys = paramiko.util.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
         self.userpass = pygit2.UserPass("robobot", password)
         self.callbacks = pygit2.RemoteCallbacks(credentials=self.userpass)
+        self.callbacks.push_update_reference = self.push_update_ref
         try:
             self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), password)
         except paramiko.ssh_exception.SSHException as e:
@@ -24,13 +25,16 @@ class Loader:
         self.transport = {}
         for sock in self.sock:
             self.sock[sock] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def push_update_ref(self, refname, message):
+        if message is not None:
+            print("FAILED TO PUSH LOG TO REPOSITORY!")
+            print("MAKE SURE YOUR GITLAB iti0201-2019 repository settings are correct ('Settings -> Repository -> Protected Branches -> Allowed to push' = Developers + Maintainers)")
 
     def ssh_command(self, host, command, retry=False):
         print("Sending command to host({})...".format(host))
         try:
             chan = self.transport[host].open_session()
             print("Session opened!")
-            print("Executing command {}".format(command))
             chan.exec_command(command) 
             return True
         except Exception as e:
@@ -93,30 +97,35 @@ class Loader:
         time.sleep(delay)
         return False
 
-    def upload_file(self, host, filename, retry=False):
-        print("upload_file({}, {})".format(host, filename))
+    def sftp_file(self, host, filename, command, retry=False):
+        print("sftp_file({}, {})".format(host, filename))
         try:
             sftp = paramiko.SFTPClient.from_transport(self.transport[host])
-            #print(sftp.listdir("."))
-            name = filename.split("/")[-1]
-            sftp.put(filename, "test/" + name)
+            if command == "put":
+                name = filename.split("/")[-1]
+                sftp.put(filename, "test/" + name)
+            else:
+                sftp.get("test/" + filename, filename)
         except Exception as e:
-            print("Unable to upload file ({}), retry to connect!".format(e))
+            print("Unable to SFTP file ({}), retry to connect!".format(e))
             self.connect(host)
             if not retry:
-                return self.upload_file(host, filename, True)
+                return self.sftp_file(host, filename, command, True)
             else:
                 return False
         return True
 
-    def clone_repository(self, uni_id):
+    def remove_student_repository(self):
         path = os.getcwd() + "/student/"
         try:
             shutil.rmtree(path)
         except:
             pass
+
+    def clone_repository(self, uni_id):
+        self.remove_student_repository()
         try:
-            pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
+            self.repository = pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
         except:
             print("Unable to clone repository!")
             return False
@@ -131,7 +140,7 @@ class Loader:
     def execute(self, robot_id):
         print("execute({})".format(robot_id))
         if self.kill(robot_id):
-            if self.ssh_command("9" + robot_id, "cd test && ROBOT_ID=" + robot_id + " timeout 300 python3 robot.py"):
+            if self.ssh_command("9" + robot_id, "cd test && ROBOT_ID=" + robot_id + " timeout 300 python3 robot.py > output.txt 2>&1"):
                 return True
         return False
 
@@ -153,11 +162,13 @@ class Loader:
                     # Upload
                     success = True
                     for filename in files:
-                        if not self.upload_file("9" + robot_id, filename):
+                        if not self.sftp_file("9" + robot_id, filename, "put"):
                             print("Unable to upload file '{}'!".format(filename))
                             success = False
                             break
                     if success:
+                        # Remove local files
+                        self.remove_student_repository()
                         # Execute robot.py with redirected output
                         self.execute(robot_id)
                 else:
@@ -170,15 +181,46 @@ class Loader:
     def fetch(self, uni_id, robot_id):
         print("fetch({}, {})".format(uni_id, robot_id))
         # Clone student repository
-        # Get output.txt
-        # Rename based on timestamp
-        # Move timestamped file to "logs" directory
-        # Add log to git commit
-        # Push commit
+        if self.clone_repository(uni_id):
+            # Get output.txt
+            if self.sftp_file("9" + robot_id, "output.txt", "get"):
+                # Remove log directory from repository
+                path = os.getcwd() + "/student/logs"
+                try:
+                    shutil.rmtree(path)
+                except:
+                    pass
+                os.mkdir("student/logs") 
+                # Rename based on timestamp
+                filename = str(int(time.time())) + ".txt"
+                relpath = "student/logs/" + filename
+                os.rename("output.txt", relpath)
+                # Add log to git commit
+                s = pygit2.Signature('Roboproge Logmaster', 'deal@with.it')
+                file_contents = ""
+                with open(relpath) as f:
+                    for line in f.readlines():
+                        file_contents += line
+                contents = self.repository.create_blob(file_contents)
+                self.repository.index.add(pygit2.IndexEntry("logs/" + filename, contents, pygit2.GIT_FILEMODE_BLOB))
+                self.repository.index.write()
+                tree = self.repository.index.write_tree()
+                master = self.repository.lookup_branch("master")
+                self.repository.create_commit('refs/heads/master',s,s,'Log upload', tree,[master.target])
+                # Push commit
+                self.repository.remotes["origin"].push(["refs/heads/master"], callbacks=self.callbacks)
+                # Remove repository
+                self.remove_student_repository()
+            else:
+                print("Unable to download output file!")
+        else:
+            print("Unable to clone repository!")
 
     def stop(self, robot_id):
         print("stop({})".format(robot_id))
-        # Execute kill python3 && stop.py
+        if self.ssh_command("9" + robot_id, "cd robot && ROBOT_ID=" + robot_id + " python3 stop.py"):
+            return True
+        return False
 
 def main():
     password = getpass.getpass("Enter password: ")
