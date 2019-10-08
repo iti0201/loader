@@ -218,8 +218,9 @@ class Loader:
 
     def stop(self, robot_id):
         print("stop({})".format(robot_id))
-        if self.ssh_command("9" + robot_id, "cd robot && ROBOT_ID=" + robot_id + " python3 stop.py"):
-            return True
+        if self.kill(robot_id):
+            if self.ssh_command("9" + robot_id, "cd robot && ROBOT_ID=" + robot_id + " python3 stop.py"):
+                return True
         return False
 
 def main():
@@ -237,6 +238,7 @@ def main():
             if candidate in ["l", "q", "f", "s"]:
                 command = candidate
                 if command == "q":
+                    loader.remove_student_repository()
                     sys.exit(0)
                 candidate = "0"
                 while len(candidate) > 1 or not candidate.isnumeric() or int(candidate) > 5 or int(candidate) < 1:
