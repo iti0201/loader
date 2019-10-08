@@ -23,8 +23,6 @@ class Loader:
             sys.exit(-1)
         self.sock = {"91": None, "92": None, "93": None, "94": None, "95": None} 
         self.transport = {}
-        for sock in self.sock:
-            self.sock[sock] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     def push_update_ref(self, refname, message):
         if message is not None:
             print("FAILED TO PUSH LOG TO REPOSITORY!")
@@ -61,6 +59,7 @@ class Loader:
         try:
             print("Connecting to {}...".format(host)) 
             hostname = "192.168.0." + host
+            self.sock[host] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock[host].connect((hostname, 22))
             print("Connected to {}!".format(host))
             self.transport[host] = paramiko.Transport(self.sock[host])
@@ -271,7 +270,7 @@ def main():
                         loader.fetch(uni_id, robot_id)
                     else:
                         loader.stop(robot_id)
-        except KeyboardInterrupt as e:
+        except (KeyboardInterrupt, EOFError) as e:
             print()
             continue
 
