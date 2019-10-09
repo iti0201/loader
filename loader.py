@@ -139,7 +139,7 @@ class Loader:
     def execute(self, robot_id):
         print("execute({})".format(robot_id))
         if self.kill(robot_id):
-            if self.ssh_command("9" + robot_id, "cd test && ROBOT_ID=" + robot_id + " timeout 300 python3 robot.py > output.txt 2>&1"):
+            if self.ssh_command("9" + robot_id, "cd test && ROBOT_ID=" + robot_id + " timeout 300 python3 -u robot.py > output.txt 2>&1"):
                 return True
         return False
 
@@ -217,9 +217,10 @@ class Loader:
 
     def stop(self, robot_id):
         print("stop({})".format(robot_id))
-        if self.kill(robot_id):
-            if self.ssh_command("9" + robot_id, "cd robot && ROBOT_ID=" + robot_id + " python3 stop.py"):
-                return True
+        self.kill(robot_id)
+        time.sleep(1)
+        if self.ssh_command("9" + robot_id, "cd robot && ROBOT_ID=" + robot_id + " python3 stop.py"):
+            return True
         return False
 
 def main():
@@ -257,19 +258,12 @@ def main():
                             if candidate == "":
                                 candidate = task_id
                         task_id = candidate
-                while True:
-                    candidate = input("command={}  uni_id={}  robot_id={}  task_id={} - [Y/n]?".format(command, uni_id, robot_id, task_id))
-                    if candidate in ["", "y", "Y", "n", "N"]:
-                        if candidate == "":
-                            candidate = "y"
-                        break
-                if candidate in ["y", "Y"]:
-                    if command == "l":
-                        loader.load(uni_id, robot_id, task_id)
-                    elif command == "f":
-                        loader.fetch(uni_id, robot_id)
-                    else:
-                        loader.stop(robot_id)
+                if command == "l":
+                    loader.load(uni_id, robot_id, task_id)
+                elif command == "f":
+                    loader.fetch(uni_id, robot_id)
+                else:
+                    loader.stop(robot_id)
         except (KeyboardInterrupt, EOFError) as e:
             print()
             continue
