@@ -200,13 +200,14 @@ class Loader:
 
     def load(self, uni_id, robot_id, task_id):
         print("load({}, {}, {})".format(uni_id, robot_id, task_id))
-        # Check if in access list
-        if len(self.access) > 0:
-            student_access = self.access.get(uni_id, [self.session])
-            if self.session not in student_access:
-                print("This student is not registered to this lab time! Your lab time is {}!".format(",".join(student_access)))
-                print("An exception can be added if you ask Gert or the assistants.")
-                return
+        if self.session is not None:
+            # Check if in access list
+            if len(self.access) > 0:
+                student_access = self.access.get(uni_id, [self.session])
+                if self.session not in student_access:
+                    print("This student is not registered to this lab time! Your lab time is {}!".format(",".join(student_access)))
+                    print("An exception can be added if you ask Gert or the assistants.")
+                    return
         # Clone student repository
         if self.clone_repository(uni_id):
             # Get source files
@@ -280,11 +281,11 @@ class Loader:
         return False
 
 def main():
-    if len(sys.argv) != 2 or (len(sys.argv) == 2 and len(sys.argv[1]) != 3):
-        print("Usage: loader.py <LAB_ID>\nExample: loader.py K08")
-        sys.exit(0)
+    session = None
+    if len(sys.argv) == 2 and len(sys.argv[1]) == 3:
+        session = sys.argv[1]
     password = getpass.getpass("Enter password: ")
-    loader = Loader(password, sys.argv[1])
+    loader = Loader(password, session)
     command = "l"
     uni_id = ""
     robot_id = "1"
