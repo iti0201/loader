@@ -8,14 +8,63 @@ import getpass
 import pygit2
 import shutil
 import time
+import threading
+
+
+class Access:
+    def __init__(self, access):
+        self.repository_name = "groups"
+        self.access = access
+        self.run = True
+        self.thread = threading.Thread(target=self.worker)
+        self.thread.start()
+
+    def remove_repository(self):
+        path = os.getcwd() + "/" + self.repository_name + "/"
+        try:
+            shutil.rmtree(path)
+        except:
+            pass
+
+    def worker(self):
+        last_update = 0
+        while self.run:
+            now = time.time()
+            if last_update + 10.0 < now:
+                self.get_access_list()
+                self.remove_repository()
+                last_update = now
+            time.sleep(0.1)
+
+    def get_access_list(self):
+        self.remove_repository()
+        try:
+            repository = pygit2.clone_repository("https://github.com/iti0201/" + self.repository_name, self.repository_name)
+        except:
+            print("Unable to clone access repository!")
+            return
+        try:
+            with open(os.getcwd() + "/" + self.repository_name + "/" + self.repository_name + ".txt") as f:
+                data = f.readlines()
+                for row in data:
+                    tokens = row.replace("\n", "").split(";")
+                    if len(tokens) > 1 and len(tokens[0]) >= 6:
+                        self.access[tokens[0]] = tokens[1:]
+        except:
+            print("Unable to read groups.txt!")
+            return
+
 
 
 class Loader:
-    def __init__(self, password):
+    def __init__(self, password, session):
         self.host_keys = paramiko.util.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
         self.userpass = pygit2.UserPass("robobot", password)
         self.callbacks = pygit2.RemoteCallbacks(credentials=self.userpass)
         self.callbacks.push_update_reference = self.push_update_ref
+        self.access = {}
+        self.session = session
+        self.updater = Access(self.access)
         try:
             self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), password)
         except paramiko.ssh_exception.SSHException as e:
@@ -151,6 +200,13 @@ class Loader:
 
     def load(self, uni_id, robot_id, task_id):
         print("load({}, {}, {})".format(uni_id, robot_id, task_id))
+        # Check if in access list
+        if len(self.access) > 0:
+            student_access = self.access.get(uni_id, [self.session])
+            if self.session not in student_access:
+                print("This student is not registered to this lab time! Your lab time is {}!".format(",".join(student_access)))
+                print("An exception can be added if you ask Gert or the assistants.")
+                return
         # Clone student repository
         if self.clone_repository(uni_id):
             # Get source files
@@ -224,8 +280,11 @@ class Loader:
         return False
 
 def main():
+    if len(sys.argv) != 2 or (len(sys.argv) == 2 and len(sys.argv[1]) != 3):
+        print("Usage: loader.py <LAB_ID>\nExample: loader.py K08")
+        sys.exit(0)
     password = getpass.getpass("Enter password: ")
-    loader = Loader(password)
+    loader = Loader(password, sys.argv[1])
     command = "l"
     uni_id = ""
     robot_id = "1"
@@ -239,6 +298,7 @@ def main():
                 command = candidate
                 if command == "q":
                     loader.remove_student_repository()
+                    loader.updater.run = False
                     sys.exit(0)
                 candidate = "0"
                 while len(candidate) > 1 or not candidate.isnumeric() or int(candidate) > 5 or int(candidate) < 1:
