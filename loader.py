@@ -64,7 +64,8 @@ class Loader:
         self.callbacks.push_update_reference = self.push_update_ref
         self.access = {}
         self.session = session
-        self.updater = Access(self.access)
+        if self.session is not None:
+            self.updater = Access(self.access)
         try:
             self.key = paramiko.RSAKey.from_private_key_file(os.path.join(os.environ["HOME"], ".ssh", "id_rsa"), password)
         except paramiko.ssh_exception.SSHException as e:
@@ -299,7 +300,8 @@ def main():
                 command = candidate
                 if command == "q":
                     loader.remove_student_repository()
-                    loader.updater.run = False
+                    if loader.session is not None:
+                        loader.updater.run = False
                     sys.exit(0)
                 candidate = "0"
                 while len(candidate) > 1 or not candidate.isnumeric() or int(candidate) > 5 or int(candidate) < 1:
