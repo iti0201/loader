@@ -40,8 +40,8 @@ class Access:
         self.remove_repository()
         try:
             repository = pygit2.clone_repository("https://github.com/iti0201/" + self.repository_name, self.repository_name)
-        except:
-            print("Unable to clone access repository!")
+        except Exception as e:
+            print("Unable to clone access repository ({})!".format(e))
             return
         try:
             with open(os.getcwd() + "/" + self.repository_name + "/" + self.repository_name + ".txt") as f:
@@ -99,7 +99,8 @@ class Loader:
         if os.path.exists(path):
                 for root, dirs, files in os.walk(path, topdown = False):
                     for name in files:
-                        source_files.append(str(os.path.join(root, name)))
+                        if ".py" in name:
+                            source_files.append(str(os.path.join(root, name)))
         else:
             print("Path not found ({})".format(path))
         return source_files
@@ -175,8 +176,10 @@ class Loader:
         self.remove_student_repository()
         try:
             self.repository = pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
-        except:
-            print("Unable to clone repository!")
+            self.repository.init_submodules()
+            self.repository.update_submodules(callbacks=self.callbacks)
+        except Exception as e:
+            print("Unable to clone repository ({})!".format(e))
             return False
         return True
 
