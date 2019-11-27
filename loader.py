@@ -175,8 +175,6 @@ class Loader:
         self.remove_student_repository()
         try:
             self.repository = pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
-            self.repository.init_submodules()
-            self.repository.update_submodules()
         except:
             print("Unable to clone repository!")
             return False
