@@ -175,7 +175,7 @@ class Loader:
     def clone_repository(self, uni_id):
         self.remove_student_repository()
         try:
-            self.repository = pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2019", "student", callbacks=self.callbacks)
+            self.repository = pygit2.clone_repository("https://gitlab.cs.ttu.ee/" + uni_id + "/iti0201-2022", "student", callbacks=self.callbacks)
             self.repository.init_submodules()
             self.repository.update_submodules(callbacks=self.callbacks)
         except Exception as e:
