@@ -84,7 +84,13 @@ class Loader:
             chan = self.transport[host].open_session()
             print("Session opened!")
             chan.exec_command(command) 
+            time.sleep(0.1)
+            if chan.exit_status_ready():
+                status = chan.recv_exit_status()
+                print(f"Session recv_exit_status == {status}")
+                return False if status == 255 else True
             return True
+            #return True
         except Exception as e:
             print("Unable to send command ({}), retry to connect!".format(e))
             self.connect(host)
@@ -185,9 +191,14 @@ class Loader:
 
     def prepare_filesystem(self, robot_id):
         print("prepare_filesystem({})".format(robot_id))
-        if not self.ssh_command("9" + robot_id, "rm -rf test && cp -r robot test"):
-            return False
-        return True
+        if self.ssh_command("9" + robot_id, "rm -rf test && cp -r robot test"):
+            print("Veryfing successful load...")
+            if self.ssh_command("9" + robot_id, "if [ $(ls test/ | wc -l) -gt 5 ]; then exit 0; fi; exit -1"):
+                return True
+            else:
+                print("COPY FAILED! RETRYING!")
+                self.prepare_filesystem(robot_id)
+        return False
 
     def execute(self, robot_id):
         print("execute({})".format(robot_id))
