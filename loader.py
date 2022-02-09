@@ -76,7 +76,7 @@ class Loader:
     def push_update_ref(self, refname, message):
         if message is not None:
             print("FAILED TO PUSH LOG TO REPOSITORY!")
-            print("MAKE SURE YOUR GITLAB iti0201-2019 repository settings are correct ('Settings -> Repository -> Protected Branches -> Allowed to push' = Developers + Maintainers)")
+            print("MAKE SURE YOUR GITLAB iti0201-2022 repository settings are correct ('Settings -> Repository -> Protected Branches -> Allowed to push' = Developers + Maintainers)")
 
     def ssh_command(self, host, command, retry=False):
         print("Sending command to host({})...".format(host))
@@ -265,10 +265,10 @@ class Loader:
                 self.repository.index.add(pygit2.IndexEntry("logs/" + filename, contents, pygit2.GIT_FILEMODE_BLOB))
                 self.repository.index.write()
                 tree = self.repository.index.write_tree()
-                master = self.repository.lookup_branch("master")
-                self.repository.create_commit('refs/heads/master',s,s,'Log upload', tree,[master.target])
+                master = self.repository.lookup_branch("main")
+                self.repository.create_commit('refs/heads/main',s,s,'Log upload', tree,[master.target])
                 # Push commit
-                self.repository.remotes["origin"].push(["refs/heads/master"], callbacks=self.callbacks)
+                self.repository.remotes["origin"].push(["refs/heads/main"], callbacks=self.callbacks)
                 # Remove repository
                 self.remove_student_repository()
             else:
