@@ -330,7 +330,7 @@ def main():
                         uni_id = input("UNI-ID: ")
                     if command == "l":
                         candidate = "bla"
-                        while len(candidate) != 2 or candidate[0] not in ["L", "O", "M"]:
+                        while len(candidate) != 2 or candidate[0] not in ["L", "O", "M", "W"]:
                             candidate = input("Task ID [{}]: ".format(task_id))
                             if candidate == "":
                                 candidate = task_id
